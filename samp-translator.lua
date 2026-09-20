@@ -30,6 +30,7 @@ local langs_url = {
     "https://github.com/moreveal/samp-translator/raw/main/languages/Russian.lang",
     "https://github.com/moreveal/samp-translator/raw/main/languages/Ukranian.lang"
 }
+local last_sent_message = nil
 ------------
 
 if not doesDirectoryExist(main_dir.."languages") then createDirectory(main_dir.."languages") end
@@ -347,8 +348,10 @@ function main()
                     raknetBitStreamWriteString(bs, messages[5]) -- text
                     raknetEmulRpcReceiveBitStream(59, bs)
                 elseif thread.style == 5 then -- onSendChat
+                    last_sent_message = messages[1]
                     sampSendChat(messages[1])
                 elseif thread.style == 6 then -- onSendCommand
+                    last_sent_message = messages[2]
                     sampSendChat(messages[1].." "..messages[2])
                 elseif thread.style == 7 then -- onSendDialogResponse
                     sampSendDialogResponse(messages[1], messages[2], messages[3], messages[4]) -- dialogid, button, list, input
@@ -368,6 +371,10 @@ function onReceiveRpc(id, bs)
             local color = raknetBitStreamReadInt32(bs)
             local tlength = raknetBitStreamReadInt32(bs)
             local text = raknetBitStreamReadString(bs, tlength)
+            if last_sent_message and text:find(last_sent_message, 1, true) then
+                last_sent_message = nil
+                return -- this is our own message echoed back; let it through untranslated
+            end
             table.insert(threads, {
                 style = 1, 
                 messages = {
