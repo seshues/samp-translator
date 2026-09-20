@@ -267,6 +267,7 @@ function main()
                                         cb_enable_out[0] = false
                                         thread.messages = {}
                                         sampAddChatMessage("[Translator]: "..phrases.NO_CONNECTION, 0xCCCCCC)
+                                        finish = true
                                     end
                                 end,
                                 function(err) 
