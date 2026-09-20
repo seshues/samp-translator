@@ -9,20 +9,22 @@ SAMP Translator is an in-game modification for the popular game mode San Andreas
 - English
 - Russian
 - Ukrainian
-- Belarusian
+- ~~Belarusian~~
 - Italian
 - Bulgarian
 - Spanish
-- Kazakh
+- ~~Kazakh~~
 - German
 - Polish
-- Serbian
+- ~~Serbian~~
 - French
 - Romanian
 - Portuguese
 - Lithuanian
 - Turkish
 - Indonesian
+
+Belarusian, Kazakh and Serbian not supported by LibreTranslate.
 
 ## Dependencies
 
@@ -43,6 +45,10 @@ Once Python is installed, proceed with setting up the local server:
 
 1. **Navigate to the Server Directory:**
    - Open a terminal or command prompt.
+   - Install the libretranslate package
+     ```
+     pip install libretranslate
+     ```
    - Change directory to the `server` folder where the server files are located. Use the `cd` command followed by the path to the `server` directory. For example:
      ```
      cd path/to/server
@@ -63,6 +69,8 @@ Once Python is installed, proceed with setting up the local server:
    ```
 
 If you see such a message - you can start using the script (console must remain open).
+
+By default only the English and Russian language packages are used, if you want to add the rest, edit the language list (LOAD_ONLY) in main.py.
 
 ## Activation
 
