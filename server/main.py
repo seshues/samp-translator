@@ -5,12 +5,13 @@ import subprocess
 import sys
 import time
 import atexit
+import asyncio
 import requests as pyrequests
 from aiohttp import web
 
 LIBRETRANSLATE_PORT = 5000
 LIBRETRANSLATE_URL = f"http://127.0.0.1:{LIBRETRANSLATE_PORT}/translate"
-LOAD_ONLY = "en,ru"
+LOAD_ONLY = "en,ru"  # "en,ru,uk,it,bg,es,de,pl,fr,ro,pt"
 
 lt_process = None
 
@@ -81,12 +82,13 @@ async def handle(request):
         return web.Response(headers=headers, text=json.dumps({"success": False, "error": "Method not allowed"}))
 
     source = target = text = None
+    texts = []  # every "text" field of a form POST; more than one means a batch request
     if request.method == "POST":
         if 'json' in request.headers.get("Content-Type").lower():
             try:
                 data = await request.json()
             except:
-                return web.Response(status=404, headers=headers, text=json.dumps({"success": False, "error": "You're specified invalid JSON"}))
+                return web.Response(status=404, headers=headers, text=json.dumps({"success": False, "error": "You've specified invalid JSON"}))
             source = data['source']
             target = data['target']
             text = data['text']
@@ -95,6 +97,7 @@ async def handle(request):
             source = data.get('source', None)
             target = data.get('target', None)
             text = data.get('text', None)
+            texts = data.getall('text', [])
     elif request.method == 'GET':
         data = request.query
         source = data.get('source', None)
@@ -104,16 +107,20 @@ async def handle(request):
     if 'source' in data and 'target' in data and 'text' in data:
         try:
             src = source if source and source.lower() != "auto" else "auto"
-            resp = pyrequests.post(LIBRETRANSLATE_URL, json={
-                "q": text, "source": src, "target": target, "format": "text"
-            }, timeout=10)
+            batch = len(texts) > 1
+            payload = {"q": texts if batch else text, "source": src, "target": target, "format": "text"}
+            # run the blocking HTTP call in a thread so the web server stays responsive
+            resp = await asyncio.get_running_loop().run_in_executor(
+                None, lambda: pyrequests.post(LIBRETRANSLATE_URL, json=payload, timeout=30 if batch else 10))
             resp.raise_for_status()
             translated = resp.json()["translatedText"]
+            if batch:  # a list of translations, in the same order as the "text" fields
+                return web.Response(headers=headers, text=json.dumps({"success": True, "texts": translated}))
             return web.Response(headers=headers, text=json.dumps({"success": True, "text": translated}))
         except Exception as e:
             return web.Response(status=500, headers=headers, text=json.dumps({"success": False, "error": str(e)}))
     else:
-        return web.Response(status=404, headers=headers, text=json.dumps({"success": False, "error": "You're specified invalid data"}))
+        return web.Response(status=404, headers=headers, text=json.dumps({"success": False, "error": "You've specified invalid data"}))
 
 app = web.Application()
 app.router.add_route('*', '/', handle)
