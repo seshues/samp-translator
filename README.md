@@ -85,3 +85,5 @@ Contributions to the SAMP Translator mod are welcome! If you have suggestions, b
 ## Disclaimer
 
 This project is not affiliated with the developers of SA-MP or the game Grand Theft Auto: San Andreas. Use this modification responsibly and adhere to the rules of the game server you are playing on. The developers are not responsible for any negative consequences resulting from the use of this mod.
+
+Claude AI assistance is used for updating and improving this fork.
