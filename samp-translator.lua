@@ -1,6 +1,6 @@
-script_version_number(17)
-script_version("release-1.9")
-script_authors("moreveal")
+script_version_number(18)
+script_version("release-2.0")
+script_authors("moreveal, seshu")
 script_description("SAMP Translator")
 script_dependencies("sampfuncs, mimgui, lfs, effil/requests")
 script_properties("work-in-pause")
@@ -19,11 +19,11 @@ local new, str, sizeof = imgui.new, ffi.string, ffi.sizeof
 -- variables
 local threads, textlabels, chatbubbles = {}, {}, {}
 local phrases = {}
-local langs_association = {"en", "ru", "uk", "be", "it", "bg", "es", "kk", "de", "pl", "sr", "fr", "ro", "pt", "ko"}
-local langs_version = 2
+local langs_association = {"en", "ru", "uk", "it", "bg", "es", "de", "pl", "fr", "ro", "pt", "ko"}
+local langs_version = 4
 local main_dir = getWorkingDirectory().."\\config\\samp-translator\\" -- directory of files for correct operation of the script
 local sizeX, sizeY = getScreenResolution()
-local update_url = "https://github.com/moreveal/samp-translator/raw/main/samp-translator.lua"
+local update_url = "https://github.com/seshues/samp-translator/raw/main/samp-translator.lua"
 local langs_url = {
     "https://raw.githubusercontent.com/moreveal/samp-translator/main/languages/version", -- get actual version of the langs
     "https://github.com/moreveal/samp-translator/raw/main/languages/English.lang",
@@ -120,13 +120,7 @@ function main()
         end)
     else updated = true end
     while not updated do wait(0) end
-    local headers = {
-        ['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/101.0.4951.54 Safari/537.36',
-        ['Content-Type'] = 'application/x-www-form-urlencoded',
-        ["sec-ch-ua-platform"] = "Windows",
-        ["sec-ch-ua"] = "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"101\", \"Google Chrome\";v=\"101\"",
-    }
-    math.randomseed(os.time())
+    local headers = {['Content-Type'] = 'application/x-www-form-urlencoded'}
 
     local api_url = "http://127.0.0.1:9550" -- Local API
 	
@@ -597,8 +591,13 @@ function main()
 		end
 	 
 		-- protect /commands from being translated
-		local groups, cmds = {}, {}
+		local groups, cmds, keeps = {}, {}, {}
 		local message = " "..original
+		-- [( text )] is never translated: it is sent as typed, without the markers
+		message = message:gsub("%[%((.-)%)%]", function(inner)
+			keeps[#keeps + 1] = inner
+			return "2xkeep"..#keeps.."q2x"
+		end)
 		-- a list is protected as ONE token (the engine mangles the commas)
 		message = message:gsub("%((/%w+[%w/, ]-)%)", function(inner)
 			if not inner:find("[/,]", 2) then return nil end -- a single command: handled below
@@ -611,6 +610,34 @@ function main()
 			return pre.."/2x"..cmd.."2x"
 		end):sub(2)
 	 
+		-- puts commands and [( )] text back into the translated (or untouched) text
+		local function restore(result)
+			result = result:gsub("2x%s*[Gg][Rr][Pp]%s*(%d+)%s*[Qq]%s*2x", function(n) return groups[tonumber(n)] or "" end)
+			result = result:gsub("((.?)/?%s*2x%s*(%w-)%s*2x)", function(whole, prev, cmd) -- restore commands
+				local orig = cmds[cmd:lower()]           -- also fixes a lost "/" or changed capitalization
+				if not orig then return whole end
+				if prev:find("^[%w"..LET.."]$") then prev = prev.." " end  -- translator swallowed the space before it
+				return prev.."/"..orig
+			end)
+			-- [( )] placeholders -> invisible markers first (the translator may have dropped either "2x"),
+			-- so the clean-up below cannot touch them; the kept text itself goes back in at the very end
+			local K, Q = "[Kk][Ee][Ee][Pp]%s*(%d+)%s*[Qq]", "\1%1\2"
+			result = result:gsub("2x%s*"..K.."%s*2x", Q)
+			result = result:gsub("2x%s*"..K, Q)
+			result = result:gsub("%f[%w]"..K.."%s*2x", Q)
+			result = result:gsub("%f[%w][Kk][Ee][Ee][Pp](%d+)[Qq]%f[%W]", Q)
+			if result:find("2x.-2x") then result = result:gsub("2x", "") end
+			result = result:gsub("{%s*(%x%x%x%x%x%x)%s*}", "{%1}")  -- repair broken color tags
+			result = result:gsub("%[%s*(.-)%s*]", "[%1]")           -- repair "[ text ]"
+			result = result:gsub("\1(%d+)\2", function(n) return keeps[tonumber(n)] or "" end)
+			return result
+		end
+	 
+		-- nothing left to translate once commands and [( )] parts are taken out: just remove the markers
+		if select(2, message:gsub("/?2x.-2x", ""):gsub("["..LET.."]", "")) < 2 then
+			return restore(message), nil
+		end
+		
 		-- multi-line text (dialogs): translate all lines in ONE request up front; translate_line then hits the cache
 		local seg_budget = MAX_SEGMENT_REQUESTS
 		if select(2, message:gsub("[\n\t]", "")) >= 2 then
@@ -641,18 +668,7 @@ function main()
 			pos = s + 1
 		end
 	 
-		local result = table.concat(out)
-		result = result:gsub("2x%s*[Gg][Rr][Pp]%s*(%d+)%s*[Qq]%s*2x", function(n) return groups[tonumber(n)] or "" end)
-		result = result:gsub("((.?)/?%s*2x%s*(%w-)%s*2x)", function(whole, prev, cmd) -- restore commands
-			local orig = cmds[cmd:lower()]           -- also fixes a lost "/" or changed capitalization
-			if not orig then return whole end
-			if prev:find("^[%w"..LET.."]$") then prev = prev.." " end  -- translator swallowed the space before it
-			return prev.."/"..orig
-		end)
-		if result:find("2x.-2x") then result = result:gsub("2x", "") end
-		result = result:gsub("{%s*(%x%x%x%x%x%x)%s*}", "{%1}")  -- repair broken color tags
-		result = result:gsub("%[%s*(.-)%s*]", "[%1]")           -- repair "[ text ]"
-		return result, nil
+		return restore(table.concat(out)), nil
 	end
 	
     lua_thread.create(function()
