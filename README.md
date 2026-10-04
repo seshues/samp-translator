@@ -78,6 +78,13 @@ To activate the SAMP Translator mod, type the following command in the SA-MP cha
 
 Once activated, the mod will automatically start translating the supported in-game elements based on the selected language.
 
+If you want to have a certain part of your input not be translated, surround it with `[( )]`
+
+Example:
+```
+Hello, I am [(First_Last)]
+```
+
 ## Contributing
 
 Contributions to the SAMP Translator mod are welcome! If you have suggestions, bug reports, or want to add support for additional languages, feel free to submit a pull request or create an issue on the GitHub repository.
